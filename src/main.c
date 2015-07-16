@@ -151,9 +151,10 @@ static void main_window_unload(Window *window) {
     // Destroy TextLayer
     text_layer_destroy(s_time_layer);
   
-    // Destroy GBitmap(s)
-    for(int i = 0; i< MAX_IMAGES; i++) {
+    if(NULL != s_next_bitmap) {
       gbitmap_destroy(s_next_bitmap);
+    }
+    if(NULL != s_background_bitmap) {
       gbitmap_destroy(s_background_bitmap);
     }
 }
