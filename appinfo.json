@@ -9,6 +9,21 @@
     "resources": {
         "media": [
             {
+                "file": "images/small_citadel_text_logo.png",
+                "name": "LOGO_TEXT",
+                "type": "png"
+            },
+            {
+                "file": "images/citadel_seal.png",
+                "name": "CITADEL_SEAL",
+                "type": "png"
+            },
+            {
+                "file": "images/caa_decal.png",
+                "name": "CAA_DECAL",
+                "type": "png"
+            },
+            {
                 "file": "images/spike.png",
                 "name": "SPIKE",
                 "type": "png"
@@ -40,7 +55,7 @@
     "shortName": "El Cid",
     "uuid": "647cad34-3c8a-47a4-877e-152411dc4c4a",
     "versionCode": 1,
-    "versionLabel": "1.1",
+    "versionLabel": "1.2",
     "watchapp": {
         "watchface": true
     }

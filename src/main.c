@@ -5,36 +5,50 @@
 //static const u_short HEIGHT = 168;
   
 // config
-static const int VIBRATE_PULSE_MS = 100;
-static const int VIBRATE_PAUSE_MS = 30;
+static const int VIBRATE_PULSE_MS = 120;
+static const int VIBRATE_PAUSE_MS = 100;
 static const int CHANGE_INTERVAL = 15; // change image every 15 minutes
   
 // rolling value for bitmap rotation
-static u_short image_pointer = 0;
+static u_short image_pointer = 1;
   
 static Window *s_main_window;
 static TextLayer *s_time_layer; 
 
-// bitmap stuff
+// bitmap layer
 static BitmapLayer *s_background_layer;
-static GBitmap *s_background_bitmap[4];
-static const u_short MAX_IMAGES = 4;
 
-static void load_images() {
-  s_background_bitmap[0] = gbitmap_create_with_resource(RESOURCE_ID_RING_WHOLE_SCREEN);
-  s_background_bitmap[1] = gbitmap_create_with_resource(RESOURCE_ID_CITADEL_BARRACKS_LOGO);
-  s_background_bitmap[2] = gbitmap_create_with_resource(RESOURCE_ID_BIGRED);
-  s_background_bitmap[3] = gbitmap_create_with_resource(RESOURCE_ID_SPIKE);
-}
+// image loader/cache stuff
+static uint32_t background_resources[] = {
+  RESOURCE_ID_RING_WHOLE_SCREEN,
+  RESOURCE_ID_CITADEL_BARRACKS_LOGO,
+  RESOURCE_ID_BIGRED,
+  RESOURCE_ID_SPIKE,
+  RESOURCE_ID_CAA_DECAL,
+  RESOURCE_ID_CITADEL_SEAL,
+  RESOURCE_ID_LOGO_TEXT
+};
+static GBitmap *s_next_bitmap;
+static GBitmap *s_background_bitmap;
+static const u_short MAX_IMAGES = 7;
 
 static void update_image() {
   // wrap around to begin
   if(image_pointer >= MAX_IMAGES) {
     image_pointer = 0;
   }
+
+  // free current bitmap
+  gbitmap_destroy(s_background_bitmap);
   
-  // create bitmap and update layer
-  bitmap_layer_set_bitmap(s_background_layer, s_background_bitmap[image_pointer]);
+  // swap next into current
+  s_background_bitmap = s_next_bitmap;
+  
+  // update layer from current
+  bitmap_layer_set_bitmap(s_background_layer, s_background_bitmap);
+  
+  // load next bitmap into next pointer
+  s_next_bitmap = gbitmap_create_with_resource(background_resources[image_pointer]);
   
   // cycle update pointer
   image_pointer++;
@@ -139,7 +153,8 @@ static void main_window_unload(Window *window) {
   
     // Destroy GBitmap(s)
     for(int i = 0; i< MAX_IMAGES; i++) {
-      gbitmap_destroy(s_background_bitmap[i]);
+      gbitmap_destroy(s_next_bitmap);
+      gbitmap_destroy(s_background_bitmap);
     }
 }
 
@@ -148,7 +163,7 @@ static void init() {
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
   
   // load
-  load_images();
+  s_next_bitmap = gbitmap_create_with_resource(background_resources[0]);
   
   // Create main Window element and assign to pointer
   s_main_window = window_create();
