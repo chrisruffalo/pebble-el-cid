@@ -15,25 +15,22 @@ static const uint32_t VIBRATE_PAUSE_MS = 240;
 // config: image change
 static const int CHANGE_INTERVAL = 10; // change image every N minutes
 
-
 // single array of time segments, allocated once
 static uint32_t VIBRATE_SEGMENTS[48];
 static u_short MAX_SEGMENTS = 48;
 
-
 // rolling value for bitmap rotation
 static const u_short START_IMAGE = 1;
 static u_short image_pointer;
-  
+
+// UI elements
 static Window *s_main_window;
 static TextLayer *s_time_layer; 
+static BitmapLayer *s_background_layer;
 
 // fonts
 static GFont s_time_font;
 static GFont s_date_font;
-
-// bitmap layer
-static BitmapLayer *s_background_layer;
 
 // image loader/cache stuff
 static uint32_t background_resources[] = {
@@ -148,6 +145,7 @@ static void custom_ding_handler() {
   }
   // chop off remainder (last space is always silent/pause otherwise)
   pattern_count = pattern_count - 1;
+  int vibrate_segment_count = pattern_count; // store value
   
   // fill array with pattern
   for(int i = 0; i < MAX_SEGMENTS; i += 2) {
@@ -161,7 +159,7 @@ static void custom_ding_handler() {
       if(MAX_SEGMENTS > (i + 1)) {
         VIBRATE_SEGMENTS[i + 1] = VIBRATE_PAUSE_MS; // followed by a pause
       }
-      pattern_count--;
+      pattern_count-=2; // subtract two because two pattern blocks
     } else {
       VIBRATE_SEGMENTS[i] = 0;
       if(MAX_SEGMENTS > (i + 1)) {
@@ -173,7 +171,7 @@ static void custom_ding_handler() {
   // enqueue pattern
   VibePattern pat = {
     .durations = VIBRATE_SEGMENTS,
-    .num_segments = pattern_count,
+    .num_segments = vibrate_segment_count,
   };
   vibes_enqueue_custom_pattern(pat);
 }
@@ -232,6 +230,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
     quarter_hour_handler();
   }
 }
+
 static void main_window_load(Window *window) {
   // Create GBitmap, then set to created BitmapLayer
   s_background_layer = bitmap_layer_create(GRect(0, 0, 144, 168));
