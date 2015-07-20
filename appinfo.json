@@ -9,9 +9,22 @@
     "resources": {
         "media": [
             {
-                "file": "images/small_citadel_text_logo.png",
-                "name": "LOGO_TEXT",
-                "type": "png"
+                "characterRegex": "[ :APM0-9]",
+                "file": "fonts/DIN 1451 Std Engschrift.ttf",
+                "name": "DIN_STD_30",
+                "type": "font"
+            },
+            {
+                "characterRegex": "[./\\-0-9 ,JjAaNnFfEeBbMmRrPpYyUuLlGgSsOoCcTtVvDd]",
+                "file": "fonts/Lekton-Regular.ttf",
+                "name": "LEKTON_REGULAR_10",
+                "type": "font"
+            },
+            {
+                "characterRegex": "[ :APM0-9]",
+                "file": "fonts/UbuntuMono-B.ttf",
+                "name": "UBUNTU_MONO_BOLD_30",
+                "type": "font"
             },
             {
                 "file": "images/citadel_seal.png",
