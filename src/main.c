@@ -5,7 +5,7 @@
 //static const u_short HEIGHT = 168;
   
 // config: hourly vibrate
-static const u_short VIBRATE_TYPE = 4; // 0 = none, 1 = short, 2 = long, 3 = double, 4 = pattern
+static const u_short VIBRATE_TYPE = 3; // 0 = none, 1 = short, 2 = long, 3 = double, 4 = pattern
 static const u_short QUARTER_HOUR_VIBRATE = 0; // 0 = none, 1 = short, 2 = long, 3 = double
 static const bool ABBREVIATE_PULSES = true;
 static const uint32_t VIBRATE_PULSE_MS = 110;
@@ -118,7 +118,6 @@ static void update_time() {
   // Display this time on the TextLayer
   text_layer_set_text(s_time_layer, buffer);
 }
-
 
 // handle hour vibrations
 static void custom_ding_handler() {
