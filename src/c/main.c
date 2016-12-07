@@ -1,26 +1,13 @@
 #include <pebble.h>
+#include "settings.h"
+#include "modes.h"
+#include "vibrate.h"
 
-// static values
-//static const u_short WIDTH = 144;
-//static const u_short HEIGHT = 168;
-  
-// config: hourly vibrate
-static const u_short VIBRATE_TYPE = 3; // 0 = none, 1 = short, 2 = long, 3 = double, 4 = pattern
-static const u_short QUARTER_HOUR_VIBRATE = 0; // 0 = none, 1 = short, 2 = long, 3 = double
-static const bool ABBREVIATE_PULSES = true;
-static const uint32_t VIBRATE_PULSE_MS = 110;
-static const uint32_t VIBRATE_LONG_PULSE_MS = 330;
-static const uint32_t VIBRATE_PAUSE_MS = 240;
-
-// config: image change
-static const int CHANGE_INTERVAL = 10; // change image every N minutes
-
-// single array of time segments, allocated once
-static uint32_t VIBRATE_SEGMENTS[48];
-static u_short MAX_SEGMENTS = 48;
+// defines
+#define PERSIST_CURRENT_WATCHFACE_MODE 0
 
 // rolling value for bitmap rotation
-static const u_short START_IMAGE = 1;
+static const u_short START_IMAGE = 0;
 static u_short image_pointer;
 
 // UI elements
@@ -41,6 +28,7 @@ static uint32_t background_resources[] = {
   RESOURCE_ID_CAA_DECAL,
   RESOURCE_ID_CITADEL_SEAL,
 };
+
 static GBitmap *s_next_bitmap;
 static GBitmap *s_background_bitmap;
 static const u_short MAX_IMAGES = 6;
@@ -51,14 +39,27 @@ static void load_fonts() {
 }
 
 static void load_initial_image() {
-  s_next_bitmap = gbitmap_create_with_resource(background_resources[START_IMAGE]);
-  image_pointer = START_IMAGE+1;
+  // read persisted watchface mode, use START_IMAGE if not available
+  image_pointer = persist_exists(PERSIST_CURRENT_WATCHFACE_MODE) ? persist_read_int(PERSIST_CURRENT_WATCHFACE_MODE) : START_IMAGE;
+  
+  // control out of bounds persist (on some platforms it seems to start at max int)
+  if(image_pointer >= MAX_IMAGES) {
+    image_pointer = 0;
+    persist_write_int(PERSIST_CURRENT_WATCHFACE_MODE, image_pointer);
+  }
+  
+  // use image pointer as normal
+  s_next_bitmap = gbitmap_create_with_resource(background_resources[image_pointer]);
+
+  // advance to next
 }
 
 static void update_image() {
   // wrap around to begin
   image_pointer = image_pointer % MAX_IMAGES;
-    
+  
+  persist_write_int(PERSIST_CURRENT_WATCHFACE_MODE, image_pointer);
+  
   // free current bitmap
   if(NULL != s_background_bitmap) {
     gbitmap_destroy(s_background_bitmap);
@@ -91,8 +92,11 @@ static void update_on_interval() {
   time_t temp = time(NULL); 
   struct tm *tick_time = localtime(&temp);
   
+  // get settings
+  ElCidSettings *settings = settings_load();
+
   // check if on change interval
-  if(tick_time->tm_min % CHANGE_INTERVAL == 0) {
+  if((tick_time->tm_min % settings->ModeChangeInterval) < 1) {
     // if on interval, change image
     update_image();
   }
@@ -119,114 +123,22 @@ static void update_time() {
   text_layer_set_text(s_time_layer, buffer);
 }
 
-// handle hour vibrations
-static void custom_ding_handler() {
-  // get hour from local time  
-  time_t temp = time(NULL); 
-  struct tm *tick_time = localtime(&temp);
-  
-  // create pattern for vibration
-  int hours = tick_time->tm_hour;
-  
-  // adjust for non-24-hour time
-  if(clock_is_24h_style() != true && hours > 12) {
-    hours = hours - 12;
-  }
-  
-  // need pattern count
-  int pattern_count = hours * 2;
-  int long_pulses = 0;
-
-  // do math to abbreviate pulses
-  if(ABBREVIATE_PULSES && hours > 5) {
-    int long_pulses = hours / 5;
-    pattern_count = pattern_count - (long_pulses * 2 * 5) + 1; // eats 10 "spaces" or 
-  }
-  // chop off remainder (last space is always silent/pause otherwise)
-  pattern_count = pattern_count - 1;
-  int vibrate_segment_count = pattern_count; // store value
-  
-  // fill array with pattern
-  for(int i = 0; i < MAX_SEGMENTS; i += 2) {
-    if(pattern_count > 0) {
-      if(long_pulses > 0) {
-        long_pulses--;
-        VIBRATE_SEGMENTS[i] = VIBRATE_LONG_PULSE_MS; // longer pulse for abbreviation
-      } else {
-        VIBRATE_SEGMENTS[i] = VIBRATE_PULSE_MS; // pulse each hour
-      }    
-      if(MAX_SEGMENTS > (i + 1)) {
-        VIBRATE_SEGMENTS[i + 1] = VIBRATE_PAUSE_MS; // followed by a pause
-      }
-      pattern_count-=2; // subtract two because two pattern blocks
-    } else {
-      VIBRATE_SEGMENTS[i] = 0;
-      if(MAX_SEGMENTS > (i + 1)) {
-        VIBRATE_SEGMENTS[i + 1] = 0;
-      }
-    }
-  }
-  
-  // enqueue pattern
-  VibePattern pat = {
-    .durations = VIBRATE_SEGMENTS,
-    .num_segments = vibrate_segment_count,
-  };
-  vibes_enqueue_custom_pattern(pat);
-}
-
-static void hourly_handler() {
-  if(1 == VIBRATE_TYPE) {
-    vibes_short_pulse();
-  } else if(2 == VIBRATE_TYPE) {
-    vibes_long_pulse();
-  } else if(3 == VIBRATE_TYPE) {
-    vibes_double_pulse();
-  } else if(4 == VIBRATE_TYPE) {
-    custom_ding_handler();
-  }
-}
-
-static void quarter_hour_handler() {
-  if(0 == QUARTER_HOUR_VIBRATE) {
-    return;
-  }
-  
-  // get hour from local time  
-  time_t temp = time(NULL); 
-  struct tm *tick_time = localtime(&temp);
-  
-  // create pattern for vibration
-  int minutes = tick_time->tm_min;
-  
-  // abort if not on the quarter hour
-  if(minutes == 0 || minutes % 15 != 0) {
-    return;
-  }
-  
-  // do pattern as configured
-  if(1 == QUARTER_HOUR_VIBRATE) {
-    vibes_short_pulse();
-  } else if(2 == QUARTER_HOUR_VIBRATE) {
-    vibes_long_pulse();
-  } else if(3 == QUARTER_HOUR_VIBRATE) {
-    vibes_double_pulse();
-  }
-}
-
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   // always update the time
   update_time();
   
   // do dings on the hour
   if(units_changed & HOUR_UNIT) {
-    hourly_handler();
+    // first call out to vibrate
+    vibrate_hourly();
   }
   
   // do updates on minute changes
   if(units_changed & MINUTE_UNIT) {
+    // update based on interval
     update_on_interval();
-    quarter_hour_handler();
+    // handle vibration
+    vibrate_quarterly();
   }
 }
 
@@ -250,8 +162,11 @@ static void main_window_load(Window *window) {
 }
 
 static void main_window_unload(Window *window) {
-    // Destroy TextLayer
+    // destroy TextLayer
     text_layer_destroy(s_time_layer);
+  
+    // destroy background layer
+    bitmap_layer_destroy(s_background_layer);
   
     if(NULL != s_next_bitmap) {
       gbitmap_destroy(s_next_bitmap);
@@ -262,15 +177,15 @@ static void main_window_unload(Window *window) {
 }
 
 static void init() {
-  // Register with TickTimerService
-  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
+  // initialize settings
+  settings_init();
   
   // load fonts
   load_fonts();
   
   // load initial bitmap
   load_initial_image();
-    
+        
   // Create main Window element and assign to pointer
   s_main_window = window_create();
 
@@ -279,22 +194,35 @@ static void init() {
     .load = main_window_load,
     .unload = main_window_unload
   });
- 
+  
   // Show the Window on the watch, with animated=true
   window_stack_push(s_main_window, true);
+  
+  // Register with TickTimerService
+  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
   
   // update the time after pushing
   update_time();
   
-  // subscribe to tap serice
-  accel_tap_service_subscribe(on_tap);
+  // reconfigure options/subscriptions based on current settings
+  //settings_reconfig();
 }
 
 static void deinit() {
+  // destroy settings
+  settings_destroy();
+  
   // unsubscribe (all) from tap service
   accel_tap_service_unsubscribe();
   
-  // Destroy Window
+  // unsubscribe (all) from minute tick
+  tick_timer_service_unsubscribe();
+  
+  // unload fonts
+  fonts_unload_custom_font(s_time_font);
+  fonts_unload_custom_font(s_date_font);
+  
+  // destroy window
   window_destroy(s_main_window);
 }
 
